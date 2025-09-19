@@ -50,7 +50,7 @@
   <main>
     <section id="create">
       <h2>Create a Post</h2>
-      <p class="muted">Write a story about yourself, including hobbies, profession, or opinions. <strong>YOU MUST USE AT LEAST THREE OF THE SUGGESTED HASHTAGS</strong> to maximize reach, engagement and Ad Revenue. You can post as many times as you would like.</p>
+      <p class="muted">Write a story about yourself, including hobbies, profession, or opinions. <strong>YOU MUST USE AT LEAST THREE OF THE SUGGESTED HASHTAGS</strong> to maximize reach.</p>
       <div class="hashtags" id="suggested"></div>
       <label for="postInput">Your post</label>
       <textarea id="postInput" placeholder="Tell your story here..."></textarea>
@@ -130,6 +130,11 @@
     return Math.round(v * f) / f;
   }
 
+  function money(value) {
+    const abs = Math.abs(value).toFixed(2);
+    return (value < 0 ? "-$" : "$") + abs;
+  }
+
   function scorePost(text) {
     const lower = text.toLowerCase();
     const used = HASHTAGS.filter(t => lower.includes(t.toLowerCase()));
@@ -140,7 +145,7 @@
       const engScore = randRange(1.1, 2.0, 1);
       const lostRev  = randRange(0.50, 5.00, 2);
       return {
-        reach: reachPct, engagement: engScore, revenue: 0,
+        reach: reachPct, engagement: engScore, revenue: -lostRev, // NEGATIVE revenue
         ok: false,
         advice: [
           `Your post only reached ${reachPct.toFixed(1)}% of your followers because you did not use suggested hashtags.`,
@@ -167,7 +172,7 @@
   function updateMetrics(m) {
     document.getElementById("reach").textContent = m.reach.toFixed(1) + "%";
     document.getElementById("engagement").textContent = m.engagement.toFixed(1);
-    document.getElementById("revenue").textContent = "$" + m.revenue.toFixed(2);
+    document.getElementById("revenue").textContent = money(m.revenue);
   }
 
   function addToFeed(text, m) {
