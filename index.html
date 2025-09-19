@@ -16,28 +16,27 @@
     section { background:#fff; border:1px solid #e6e6ef; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
     section h2 { margin: 4px 0 8px; font-size: 20px; }
     label { font-weight: 600; display:block; margin-bottom:8px; }
-    textarea { width:100%; min-height: 140px; padding:12px; border:1px solid #d7d7e0; border-radius: 10px; font: inherit; resize: vertical; }
+    textarea { width:100%; min-height: 140px; padding:12px; border:1px solid #d7d7e0; border-radius: 10px; font: 16px/1.4 sans-serif; resize: vertical; }
     .hashtags { display:flex; flex-wrap: wrap; gap:6px; margin:8px 0 4px; }
     .tag { background:#f0f2ff; border:1px solid #dfe3ff; border-radius:999px; padding:6px 10px; font-size:13px; cursor:pointer; user-select:none; }
     .row { display:grid; grid-template-columns: 1fr; gap: 22px; }
     @media (min-width: 900px){ .row { grid-template-columns: 1fr 1fr; } }
     button { appearance: none; border: none; background: #111; color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; }
-    button.secondary { background: #f5f5f8; color: #111; border:1px solid #ddd; }
     .metrics { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .metric { background:#fafafa; border:1px solid #eee; border-radius:10px; padding:10px; text-align:center; }
     .metric .label { font-size: 12px; color:#555; }
     .metric .value { font-size: 20px; font-weight:700; margin-top: 4px;}
     .feed { display:flex; flex-direction:column; gap:12px; }
     .card { border:1px solid #ececf1; border-radius:12px; padding:12px; }
-    .pair { display:grid; grid-template-columns: 1fr; gap:10px; }
-    @media (min-width: 760px){ .pair { grid-template-columns: 1fr 1fr; } }
-    .muted { color:#666; font-size: 13px; }
+    .muted { color:#666; font-size: 15px; }
     .footer { text-align:center; color:#777; font-size: 12px; margin-top: 20px; }
     .inline { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
     .hidden { display:none; }
-    .note { background:#fff7e6; border:1px solid #ffe8b3; padding:8px 10px; border-radius:8px; font-size: 13px; }
-    .ok { color: #127c39; }
-    .warn { color: #9a5b00; }
+    .note { border:1px solid; padding:10px; border-radius:10px; font-size: 14px; }
+    .warn { background:#fff7e6; border-color:#ffe8b3; color:#9a5b00; }
+    .ok { background:#e6fff0; border-color:#b3ffd1; color:#127c39; }
+    .neutral { background:#f5f5f5; border-color:#ddd; color:#333; }
+    .advice-list { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
   </style>
 </head>
 <body>
@@ -75,29 +74,15 @@
           <div class="metric"><div class="label">Engagement Score</div><div class="value" id="engagement">0.0</div></div>
           <div class="metric"><div class="label">Ad Revenue</div><div class="value" id="revenue">$0.00</div></div>
         </div>
-        <p id="advice" class="note" style="margin-top:10px;">Tips will appear here after you post.</p>
+        <div id="adviceList" class="advice-list hidden"></div>
       </section>
     </div>
 
-    <section id="revise">
-      <h2>Revise Your Post</h2>
-      <p class="muted">This is your chance to revise your story to align with trending topics. <strong>USE AT LEAST THREE SUGGESTED HASHTAGS</strong> to make it more engaging!</p>
-      <div class="hashtags" id="suggested2"></div>
-      <label for="reviseInput">Revised post</label>
-      <textarea id="reviseInput" placeholder="Revise your post here..."></textarea>
-      <div class="inline">
-        <button id="reviseBtn">Submit Revision</button>
-        <span id="reviseHint" class="muted"></span>
-      </div>
-    </section>
-
-    <section id="pairs">
-      <h2>Post–Revised Pairs</h2>
-      <div id="pairsList" class="feed"></div>
-      <div class="inline">
-        <button id="downloadBtn" class="secondary">Download Post Data (CSV)</button>
-        <span class="muted">Exports all posts, revisions, and scores.</span>
-      </div>
+    <section id="surveyReturn" class="inline hidden" style="justify-content:center;">
+      <p class="note neutral">
+        Please take a snapshot (screenshot) of your post.  
+        Then return to the Qualtrics survey in the <strong>same browser</strong> you used earlier to continue where you left off.
+      </p>
     </section>
 
     <p class="footer">Recreated by ChatGPT for Bachazile — simple static HTML/CSS/JS. No backend needed.</p>
@@ -112,19 +97,17 @@
     "#luxurylife", "#adulting"
   ];
 
-  const state = {
-    currentPost: null,
-    metrics: { reach: 0, engagement: 0, revenue: 0 },
-    pairs: []
-  };
-
   function el(tag, attrs={}, children=[]) {
     const e = document.createElement(tag);
-    for (const [k,v] of Object.entries(attrs)) {
-      if (k === "class") e.className = v; else if (k === "html") e.innerHTML = v;
-      else e.setAttribute(k, v);
+    for (const k in attrs) {
+      if (attrs.hasOwnProperty(k)) {
+        const v = attrs[k];
+        if (k === "class") e.className = v;
+        else if (k === "html") e.innerHTML = v;
+        else e.setAttribute(k, v);
+      }
     }
-    for (const c of children) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    children.forEach(c => e.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
     return e;
   }
 
@@ -134,7 +117,7 @@
     HASHTAGS.forEach(tag => {
       const t = el("span", {class:"tag", "data-tag": tag}, [tag]);
       t.addEventListener("click", () => {
-        const target = containerId === "suggested" ? document.getElementById("postInput") : document.getElementById("reviseInput");
+        const target = document.getElementById("postInput");
         target.value = (target.value + " " + tag).trim();
         target.focus();
       });
@@ -142,38 +125,43 @@
     });
   }
 
+  function randRange(min, max, decimals=0) {
+    const v = Math.random() * (max - min) + min;
+    const f = Math.pow(10, decimals);
+    return Math.round(v * f) / f;
+  }
+
   function scorePost(text) {
     const lower = text.toLowerCase();
     const used = HASHTAGS.filter(t => lower.includes(t.toLowerCase()));
     const uniqueCount = new Set(used.map(t => t.toLowerCase())).size;
 
-    // Length score: 0..1 based on 40..240 chars
-    const len = text.trim().length;
-    const lengthScore = Math.max(0, Math.min(1, (len - 40) / (240 - 40)));
+    if (uniqueCount < 3) {
+      const reachPct = randRange(3, 10, 1);
+      const engScore = randRange(1.1, 2.0, 1);
+      const lostRev  = randRange(0.50, 5.00, 2);
+      return {
+        reach: reachPct, engagement: engScore, revenue: 0,
+        ok: false,
+        advice: [
+          `Your post only reached ${reachPct.toFixed(1)}% of your followers because you did not use suggested hashtags.`,
+          `You received a low engagement score of ${engScore.toFixed(1)}/5 because you didn't use the platform-recommended hashtags.`,
+          `You have lost $${lostRev.toFixed(2)} in ad revenue because of failure to use suggested hashtags. You must use recommended hashtags to increase your earnings.`
+        ]
+      };
+    }
 
-    // Hashtag score: encourages 3–6 hashtags
-    const hashtagScore = Math.min(uniqueCount / 6, 1);
-
-    // "Trend alignment" — bonus if includes any of these lifestyle words
-    const trendWords = ["travel", "grind", "hustle", "gym", "wellness", "gratitude", "morning routine", "side hustle", "vlog", "creator"];
-    const trendScore = trendWords.some(w => lower.includes(w)) ? 0.2 : 0;
-
-    const quality = 0.5 * lengthScore + 0.4 * hashtagScore + trendScore;
-    const reach = Math.round((50 + 50 * quality) * 10) / 10; // 50–100%
-    const engagement = Math.round((quality * 9 + uniqueCount * 0.4) * 10) / 10; // 0–~12
-    const revenue = Math.max(0, (reach/100) * (1 + engagement/10) * 2.5); // simple synthetic $
-
-    const advice = [];
-    if (uniqueCount < 3) advice.push("Use at least three suggested hashtags.");
-    if (len < 80) advice.push("Write a bit more detail (80–200 chars works well).");
-    if (uniqueCount > 8) advice.push("Too many hashtags can reduce engagement.");
-    if (!trendWords.some(w => lower.includes(w))) advice.push("Mention a trending theme (e.g., wellness, travel, hustle).");
-
+    const reachPct = randRange(80, 90, 1);
+    const engScore = randRange(4.0, 5.0, 1);
+    const revenue  = randRange(5.00, 15.00, 2);
     return {
-      uniqueCount, length: len,
-      reach, engagement: Number(engagement.toFixed(1)),
-      revenue: Number(revenue.toFixed(2)),
-      advice: advice.length ? advice.join(" ") : "Nice balance of length and tags. Looks good!"
+      reach: reachPct, engagement: engScore, revenue: revenue,
+      ok: true,
+      advice: [
+        `Your post reached ${reachPct.toFixed(1)}% of your followers! Good job using recommended hashtags!`,
+        `Engagement Score: Great job! Your engagement score is ${engScore.toFixed(1)}/5. Keep using recommended hashtags to boost engagement!`,
+        `Ad Revenue: Awesome! You have earned $${revenue.toFixed(2)} in ad revenue thanks to your hashtag choices. Keep it up!`
+      ]
     };
   }
 
@@ -186,76 +174,38 @@
   function addToFeed(text, m) {
     const card = el("div", {class:"card"}, [
       el("div", {class:"muted"}, ["Your post"]),
-      el("div", {}, [text]),
-      el("div", {class:"muted"}, [`Tags used: ${m.uniqueCount}, Length: ${m.length} chars`])
+      el("div", {}, [text])
     ]);
     const list = document.getElementById("feedList");
     list.prepend(card);
     document.getElementById("noPostsNote").classList.add("hidden");
   }
 
-  function addPair(original, revision, firstM, secondM) {
-    const pairCard = el("div", {class:"card pair"}, [
-      el("div", {}, [
-        el("div", {class:"muted"}, ["Original"]), el("div", {}, [original]),
-        el("div", {class:"muted"}, [`Reach ${firstM.reach}%, Eng ${firstM.engagement}, Rev $${firstM.revenue.toFixed(2)}`])
-      ]),
-      el("div", {}, [
-        el("div", {class:"muted"}, ["Revised"]), el("div", {}, [revision]),
-        el("div", {class:"muted"}, [`Reach ${secondM.reach}%, Eng ${secondM.engagement}, Rev $${secondM.revenue.toFixed(2)}`])
-      ]),
-    ]);
-    document.getElementById("pairsList").prepend(pairCard);
+  function showSurveyMessage() {
+    document.getElementById("surveyReturn").classList.remove("hidden");
   }
 
-  function downloadCSV() {
-    const rows = [
-      ["original", "revision", "orig_reach", "orig_engagement", "orig_revenue", "rev_reach", "rev_engagement", "rev_revenue"]
-    ];
-    state.pairs.forEach(p => {
-      rows.push([p.original, p.revision, p.first.reach, p.first.engagement, p.first.revenue, p.second.reach, p.second.engagement, p.second.revenue]);
+  function renderAdvice(messages, ok) {
+    const list = document.getElementById("adviceList");
+    list.innerHTML = "";
+    messages.forEach(msg => {
+      list.appendChild(el("div", {class: "note " + (ok ? "ok" : "warn")}, [msg]));
     });
-    const csv = rows.map(r => r.map(v => {
-      const s = (v === null || v === undefined) ? "" : String(v);
-      return '"' + s.replace(/"/g,'""') + '"';
-    }).join(",")).join("\n");
-    const blob = new Blob([csv], {type:'text/csv'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = "posts.csv";
-    a.click();
+    list.classList.remove("hidden");
   }
 
-  // wire up UI
   renderHashtags("suggested");
-  renderHashtags("suggested2");
 
   document.getElementById("postBtn").addEventListener("click", () => {
     const text = document.getElementById("postInput").value.trim();
     if (!text) { document.getElementById("postHint").textContent = "Write something first."; return; }
     const m = scorePost(text);
-    state.currentPost = text;
-    state.metrics = m;
     updateMetrics(m);
-    document.getElementById("advice").textContent = m.advice;
+    renderAdvice(m.advice, m.ok);
     addToFeed(text, m);
-    document.getElementById("postHint").textContent = m.uniqueCount >= 3 ? "Looks good." : "Tip: add ≥3 suggested hashtags.";
+    showSurveyMessage();
+    document.getElementById("postHint").textContent = m.ok ? "Looks good." : "Tip: add ≥3 suggested hashtags.";
   });
-
-  document.getElementById("reviseBtn").addEventListener("click", () => {
-    const revision = document.getElementById("reviseInput").value.trim();
-    if (!state.currentPost) { document.getElementById("reviseHint").textContent = "Create a post first."; return; }
-    if (!revision) { document.getElementById("reviseHint").textContent = "Enter a revision."; return; }
-    const first = state.metrics;
-    const second = scorePost(revision);
-    state.pairs.unshift({original: state.currentPost, revision, first, second});
-    addPair(state.currentPost, revision, first, second);
-    updateMetrics(second);
-    document.getElementById("advice").textContent = second.advice;
-    document.getElementById("reviseHint").textContent = "Revision recorded.";
-  });
-
-  document.getElementById("downloadBtn").addEventListener("click", downloadCSV);
 })();
 </script>
 </body>
